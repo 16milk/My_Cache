@@ -185,9 +185,7 @@ public:
         historyList_->put(key, ++historyCount);
         if (historyCount >= k_)
         {
-            // 移除历史访问记录
             historyList_->remove(key);
-            // 添加入缓存中
             KLruCache<Key, Value>::put(key, value);
         }
         return KLruCache<Key, Value>::get(key);
@@ -195,6 +193,7 @@ public:
 
     void put(Key key, Value value)
     {
+        // 先判断是否在缓存中
         if (KLruCache<Key, Value>::get(key) != "")
             KLruCache<Key, Value>::put(key, value);
 
@@ -216,7 +215,50 @@ private:
 template<typename Key, typename Value>
 class KHashLruCaches
 {
+public:
+    KHashLruCaches(size_t capacity, int sliceNum)
+        : capacity_(capacity)
+        , sliceNum_(sliceNum > 0 ? sliceNum : std::thread::hardware_concurrency())
+    {
+        size_t sliceSize = std::ceil(capacity_ / static_cast<double>(sliceNum_));
+        for (int i = 0; i < sliceNum_; i ++)
+        {
+            lruSliceCaches_.emplace_back(new KLruCache<Key, Value>(sliceSize));
+        }
+    }
 
-}
+    void put(Key key, Value value)
+    {
+        size_t sliceIndex = Hash(key) % sliceNum_;
+        return lruSliceCaches_[sliceNum]->put(key, value);
+    }
 
-}
+    bool get(Key key, Value& value)
+    {
+        size_t sliceIndex = Hash(key) % sliceNum_;
+        return lruSliceCaches_[sliceIndex]->get(key, value);
+    }
+
+    Value get(Key key)
+    {
+        Value value{};
+        get(key, value);
+        return value;
+    }
+
+private:
+    // 将key转换成hash值
+    size_t Hash(Key key)
+    {
+        // 函数模板
+        std::hash<Key> hashFunc;
+        return hashFunc(key);
+    }
+
+private:
+    size_t capacity_;
+    int sliceNum;
+    std::vector<std::unique_ptr<KLruCache<Key, Value>>> lruSliceCaches_;
+};
+
+} // namespace KamaCache
