@@ -37,4 +37,5 @@ public:
     template<typename K, typename V> friend class ArcLfuPart;
 
 }; 
+
 } // namespace KamaCache
