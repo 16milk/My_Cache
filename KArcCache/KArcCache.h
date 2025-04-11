@@ -40,13 +40,49 @@ public:
     bool get(Key key, Value& value) override
     {
         checkGhostCaches(key);
+
         bool shouldTransform = false;
+        if (lruPart_->get(key, value, shouldTransform))
+        {
+            if (shouldTransform)
+            {
+                lfuPart_->put(key, value);
+            }
+            return true;
+        }
+        return lfuPart_->get(key, value);
     }
 
     Value get(Key key) override
     {
-
+        Value value{};
+        get(key, value);
+        return value;
     }
+
+private:
+    bool checkGhostCaches(Key key)
+    {
+        bool inGhost = false;
+        if (lruPart_->checkGhost(key))
+        {
+            if (lfuPart_->decreaseCapacity())
+            {
+                lruPart_->increaseCapacity();
+            }
+            inGhost = true;
+        }
+        else if (lfuPart_->checkGhost(key))
+        {
+            if (lruPart_->decreaseCapacity())
+            {
+                lfuPart_->increaseCapacity();
+            }
+            inGhost = true;
+        }
+        return inGhost;
+    }
+
 
 private:
     size_t capacity_;
